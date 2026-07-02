@@ -1,5 +1,11 @@
--- Source: https://wiki.gtnewhorizons.com/wiki/Pseudostable_Black_Hole_Containment_Field#Method_2:_OpenComputers
--- Credits: Fox
+-- Black Hole Compressor Script
+-- The primary change versus the wiki version is adding a conditionallyUseCollapser mode, which will conditionally 
+-- insert a collapser if there are still pending crafts to run, but will otherwise wait to time out naturally.
+-- It is also configured to store black hole seeds and collapsers in the super stocker rather than from main net (this isjust done by setting interfaceSide = stockerSide and obv not using an interface)
+-- 
+-- Based on https://wiki.gtnewhorizons.com/wiki/Pseudostable_Black_Hole_Containment_Field#Method_2:_OpenComputers
+-- Original Credits: Fox
+-- 
 local component = require('component')
 local sides = require('sides')
 local bhc = component.gt_machine
@@ -18,29 +24,32 @@ local maxRuntime = 100
 local targetStability = 10
 
 -- Whether or not to use collapsers
-local useCollapser = true
+local useCollapser = false
+
+-- Whether or not to use a collapser when there are pending crafts (rather than waiting for it to close natuarally)
+local conditionallyUseCollapser = true
 
 -- Whether or not to consume extra spacetime to save the last recipe.
 local voidProtection = true
 
   -- Side Options: [north, south, east, west, up, down]
 
--- Side of Redstone I/O with Wireless Receiver
-local receiverSide = sides.east
+-- Side of Redstone I/O with Wireless Receiver ie, (pending crafting item inputs)
+local receiverSide = sides.up
 
 -- Side of Redstone I/O with Wireless Transmitter
-local transmitterSide = sides.west
+local transmitterSide = sides.south
 
 -- Side of Redstone I/O with Black Hole Utility Hatch (Optional)
-local hatchSide = sides.down
+local hatchSide = sides.east
 
 -- Side of Transposer with ME Interface
-local interfaceSide = sides.west
+local interfaceSide = sides.north
 
 -- Side of Transposer with Super Stock Replenisher
-local stockerSide = sides.up
+local stockerSide = sides.north
 
--- Side of Transposer with Input Bus
+-- Side of Transposer with GT Input Bus
 local busSide = sides.down
 
 -- ====== END CONFIG ======
@@ -119,8 +128,17 @@ while true do
             t.transferItem(interfaceSide, busSide, 1, 2)
 
           else
+            print('BHC: Waiting for black hole to passively collapse...')
             local c = 0
             while r.getInput(hatchSide) > 0 do -- 15 Minutes Ideally
+              print('.')
+              
+              if conditionallyUseCollapser and r.getInput(receiverSide) > 0 then
+                  print('BHC: Using Collapser to close early due to pending work')
+                  t.transferItem(interfaceSide, busSide, 1, 2)
+                  break    
+              end
+
               os.sleep(20)
               c = c+1
               if c > 47 then break end -- 16 Minutes
